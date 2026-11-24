@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LogCanary prototype</title>
+<style>
+:root{--bg:#F2F4F8;--surface:#FFFFFF;--ink:#101B2D;--muted:#586277;--line:#D8DEE9;--hi-bg:#FFD9D6;--hi-fg:#8A1212;--me-bg:#FFE9B0;--me-fg:#6B4A00;--lo-bg:#D5EEDC;--lo-fg:#1B5E32;--logbg:#0A1424;--logfg:#E6EBF5;--canary:#FFD23F;--on-canary:#101B2D;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0B1220;--surface:#16233A;--ink:#EEF2FA;--muted:#A3AEC4;--line:#2A3A57;--hi-bg:#5A1F24;--hi-fg:#FFD6D6;--me-bg:#5C4608;--me-fg:#FFE7A3;--lo-bg:#1B4A2E;--lo-fg:#C8F2D5;--logbg:#060D1A;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0B1220;--surface:#16233A;--ink:#EEF2FA;--muted:#A3AEC4;--line:#2A3A57;--hi-bg:#5A1F24;--hi-fg:#FFD6D6;--me-bg:#5C4608;--me-fg:#FFE7A3;--lo-bg:#1B4A2E;--lo-fg:#C8F2D5;--logbg:#060D1A;color-scheme:dark}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:24px 16px 56px;display:flex;flex-direction:column;gap:24px}
+h1{font-size:40px;line-height:1.1;margin:0 0 8px;letter-spacing:-.02em}
+.brand-lockup{display:flex;align-items:center;gap:18px;margin:0 0 18px;min-width:0}
+.brand-mark{display:block;width:76px;height:76px;flex:none;filter:drop-shadow(0 2px 3px rgba(16,27,45,.16))}
+.brand-wordmark{display:block;color:var(--ink);font-size:clamp(34px,7vw,52px);font-weight:850;line-height:1;letter-spacing:-.045em;text-rendering:geometricPrecision}
+@media(max-width:420px){.brand-lockup{gap:12px}.brand-mark{width:62px;height:62px}.brand-wordmark{font-size:clamp(30px,8vw,40px)}}
+h2{font-size:22px;margin:8px 0 0}
+p{margin:0}
+.lead{color:var(--muted);max-width:60ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px}
+label.t{display:block;font-weight:600;margin-bottom:8px}
+textarea{width:100%;min-height:180px;resize:vertical;background:var(--logbg);color:var(--logfg);border:1px solid var(--line);border-radius:10px;padding:14px;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.bar{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+button,.btn{min-height:44px;padding:0 18px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 16px system-ui,sans-serif;cursor:pointer;display:inline-flex;align-items:center}
+button.pri{background:var(--canary);color:var(--on-canary);border-color:var(--canary)}
+button:focus-visible,.btn:focus-visible,textarea:focus-visible,input:focus-visible+.btn{outline:3px solid var(--ink);outline-offset:2px}
+.note{color:var(--muted);font-size:14px;margin-top:12px}
+#msg{color:var(--hi-fg);font-weight:600;margin-top:10px;min-height:0}
+.score{display:flex;gap:20px;align-items:center;background:var(--canary);color:var(--on-canary);border-color:var(--canary)}
+.score .num{font-size:76px;line-height:1;font-weight:800;letter-spacing:-.04em;min-width:2ch}
+.score .sub{font-size:14px;opacity:.85}
+.meter{height:10px;border-radius:6px;background:rgba(16,27,45,.2);margin-top:10px;overflow:hidden}
+.meter span{display:block;height:100%;background:var(--on-canary);width:0}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:4px 12px;border-radius:999px;font-size:14px;font-weight:600}
+.High{background:var(--hi-bg);color:var(--hi-fg)}.Medium{background:var(--me-bg);color:var(--me-fg)}.Low{background:var(--lo-bg);color:var(--lo-fg)}
+.log{background:var(--logbg);color:var(--logfg);border-radius:12px;padding:12px 0;overflow-x:auto;font:13.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.ln{display:flex;white-space:pre;padding:0 14px;min-width:max-content;border-left:3px solid transparent}
+.ln.hit{background:rgba(255,210,63,.08);border-left-color:var(--canary)}
+.ln .n{width:3ch;margin-right:14px;text-align:right;color:#7C8AA5;flex:none}
+mark{padding:1px 4px;border-radius:4px;font-weight:700}
+mark.High{background:#FF6B6B;color:#1A0000}mark.Medium{background:#FFD23F;color:#101B2D}mark.Low{background:#6EE7A0;color:#05301A}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:480px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font-size:15px}
+th{color:var(--muted);font-weight:600}
+code{font:14px ui-monospace,Menlo,Consolas,monospace}
+ul{margin:8px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div class="brand-lockup" aria-label="LogCanary">
+  <svg class="brand-mark" viewBox="0 0 112 112" role="img" aria-label="LogCanary bird logo">
+    <rect x="3" y="3" width="106" height="106" rx="25" fill="#FFD23F"/>
+    <path d="M34 70c0-17 10-30 25-30 12 0 21 9 21 21 0 11-8 20-20 20H46c-7 0-12-4-12-11Z" fill="#101B2D"/>
+    <circle cx="66" cy="46" r="13" fill="#101B2D"/>
+    <circle cx="70" cy="43" r="3.2" fill="#FFD23F"/>
+    <path d="m79 47 14 5-14 5Z" fill="#101B2D"/>
+    <path d="m49 79-4 10m17-9 3 9" stroke="#101B2D" stroke-width="5" stroke-linecap="round"/>
+  </svg>
+  <span class="brand-wordmark">LogCanary</span>
+</div>
+<p class="lead">Paste or upload an application log. LogCanary finds passwords, tokens, emails, phone numbers and IP addresses, shows where they leak and masks them in the report.</p>
+</header>
+
+<section class="card">
+<label class="t" for="in">Log text</label>
+<textarea id="in" spellcheck="false" placeholder="Paste log lines here, or load the sample log"></textarea>
+<div class="bar">
+<button id="scan" class="pri">Scan log</button>
+<button id="sample">Load sample log</button>
+<input id="file" type="file" accept=".log,.txt,text/plain" hidden>
+<label class="btn" for="file">Upload file</label>
+<button id="clear">Clear</button>
+</div>
+<p id="msg" role="status"></p>
+<p class="note">Everything runs in your browser. Your log is not uploaded or stored.</p>
+</section>
+
+<section id="out" hidden>
+<div class="card score">
+<div class="num" id="score">0</div>
+<div style="flex:1">
+<h2 id="verdict" style="margin:0"></h2>
+<p class="sub" id="sum"></p>
+<div class="meter"><span id="fill"></span></div>
+<p class="sub" style="margin-top:6px">Score = 100 − (High × 10 + Medium × 5 + Low × 2)</p>
+</div>
+</div>
+<div class="chips" id="chips" style="margin-top:16px"></div>
+<h2 style="margin-top:24px">Log with leaks highlighted</h2>
+<div class="log" id="log" style="margin-top:12px"></div>
+<h2 style="margin-top:24px">Findings</h2>
+<div class="card scroll" style="margin-top:12px;padding:8px">
+<table><thead><tr><th>Line</th><th>Type</th><th>Severity</th><th>Masked value</th></tr></thead><tbody id="rows"></tbody></table>
+</div>
+<h2 style="margin-top:24px">How to fix</h2>
+<ul id="tips"></ul>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const stars=v=>v.length<=2?"***":v[0]+"*".repeat(Math.min(v.length-2,6))+v[v.length-1];
+const RULES=[
+{type:"Password",sev:"High",kv:true,re:/(?:password|passwd|pwd)\s*[=:]\s*\S+/gi,tip:"Never log passwords. Remove them from log statements and request dumps."},
+{type:"API key or token",sev:"High",kv:true,re:/(?:api[_-]?key|token|secret)\s*[=:]\s*\S+/gi,tip:"Never log tokens or API keys. Keep them in a secrets manager and redact headers."},
+{type:"Email",sev:"Medium",re:/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,tip:"Mask or hash email addresses before logging them."},
+{type:"Phone number",sev:"Medium",re:/(?<![\d.])(?:\+91[-\s]?)?[6-9]\d{9}(?!\d)/g,tip:"Log only the last 2 to 4 digits of a phone number."},
+{type:"IP address",sev:"Low",re:/\b(?:\d{1,3}\.){3}\d{1,3}\b/g,ok:s=>s.split(".").every(n=>+n<=255),tip:"Log IP addresses only when needed and set a retention period."}
+];
+function mask(r,s){
+ if(r.kv){const m=s.match(/^([^=:]*[=:]\s*)([\s\S]*)$/);return m[1]+stars(m[2]);}
+ if(r.type==="Email")return s[0]+"****"+s.slice(s.indexOf("@"));
+ if(r.type==="Phone number")return "*".repeat(s.length-2)+s.slice(-2);
+ const p=s.split(".");return p[0]+"."+p[1]+".*.*";
+}
+function scanLine(line){
+ const taken=[];
+ RULES.forEach(r=>{
+  r.re.lastIndex=0;let m;
+  while((m=r.re.exec(line))){
+   const s=m.index,e=s+m[0].length;
+   if(r.ok&&!r.ok(m[0]))continue;
+   if(taken.some(t=>s<t.e&&e>t.s))continue;
+   taken.push({s,e,r,raw:m[0]});
+  }
+ });
+ return taken.sort((a,b)=>a.s-b.s);
+}
+function run(){
+ const text=$("in").value;
+ if(!text.trim()){$("msg").textContent="Paste a log or load the sample log first.";$("out").hidden=true;return;}
+ $("msg").textContent="";
+ const lines=text.split(/\r?\n/),found=[];let html="";
+ lines.forEach((ln,i)=>{
+  const hits=scanLine(ln);let out="",pos=0;
+  hits.forEach(h=>{
+   const masked=mask(h.r,h.raw);
+   out+=esc(ln.slice(pos,h.s))+'<mark class="'+h.r.sev+'">'+esc(masked)+"</mark>";
+   pos=h.e;
+   found.push({line:i+1,type:h.r.type,sev:h.r.sev,masked});
+  });
+  out+=esc(ln.slice(pos));
+  html+='<div class="ln'+(hits.length?" hit":"")+'"><span class="n">'+(i+1)+'</span><span>'+(out||" ")+"</span></div>";
+ });
+ const c={High:0,Medium:0,Low:0};found.forEach(f=>c[f.sev]++);
+ const score=Math.max(0,100-(c.High*10+c.Medium*5+c.Low*2));
+ $("score").textContent=score;
+ $("fill").style.width=score+"%";
+ $("verdict").textContent=!found.length?"No sensitive data found":score>=80?"Good":score>=50?"Needs improvement":"Risky";
+ $("sum").textContent=lines.length+" lines scanned, "+found.length+" leaks found ("+c.High+" high, "+c.Medium+" medium, "+c.Low+" low)";
+ const byType={};found.forEach(f=>byType[f.type]=(byType[f.type]||0)+1);
+ $("chips").innerHTML=Object.keys(byType).map(t=>'<span class="chip '+found.find(f=>f.type===t).sev+'">'+esc(t)+": "+byType[t]+"</span>").join("");
+ $("log").innerHTML=html;
+ $("rows").innerHTML=found.length?found.map(f=>"<tr><td>"+f.line+"</td><td>"+esc(f.type)+'</td><td><span class="chip '+f.sev+'">'+f.sev+"</span></td><td><code>"+esc(f.masked)+"</code></td></tr>").join(""):'<tr><td colspan="4">Nothing to report.</td></tr>';
+ const tips=RULES.filter(r=>byType[r.type]).map(r=>r.tip);
+ tips.push("Turn off DEBUG logging in production and restrict who can read log files.");
+ $("tips").innerHTML=tips.map(t=>"<li>"+esc(t)+"</li>").join("");
+ $("out").hidden=false;
+ $("out").scrollIntoView({behavior:"smooth",block:"start"});
+}
+const SAMPLE=[
+"2026-11-18 10:15:22 INFO  Server started on port 5000",
+"2026-11-18 10:15:41 INFO  Login attempt email=rahul.sharma@example.com",
+"2026-11-18 10:15:42 DEBUG Request body: username=rahul password=Test@123",
+"2026-11-18 10:16:03 INFO  OTP sent to +91 9876543210",
+"2026-11-18 10:16:30 DEBUG Header Authorization token=eyJhbGciOiJIUzI1NiJ9abc",
+"2026-11-18 10:17:45 ERROR Payment failed for client 192.168.1.25",
+"2026-11-18 10:18:10 INFO  Order 4821 shipped to priya@example.org",
+"2026-11-18 10:19:00 INFO  Server heartbeat OK"
+].join("\n");
+$("scan").onclick=run;
+$("sample").onclick=()=>{$("in").value=SAMPLE;run();};
+$("clear").onclick=()=>{$("in").value="";$("out").hidden=true;$("msg").textContent="";};
+$("file").onchange=e=>{
+ const f=e.target.files[0];if(!f)return;
+ if(f.size>1048576){$("msg").textContent="File is larger than 1 MB. Upload a smaller log.";return;}
+ const r=new FileReader();
+ r.onload=()=>{$("in").value=r.result;run();};
+ r.onerror=()=>{$("msg").textContent="Could not read this file. Upload a text log (.log or .txt).";};
+ r.readAsText(f);
+};
+</script>
+</body>
+</html>
